@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Routes, Route, Link, NavLink } from 'react-router-dom'
-import { Search, BarChart3, Flame, TrendingUp, Phone, Mail } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Search, BarChart3, Flame, TrendingUp, Mail, History } from 'lucide-react'
+import { motion } from 'framer-motion'
 import { Line, Bar } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -50,6 +50,7 @@ function Navbar() {
           {navItem({ to: '/compare', label: 'Price Comparison', icon: Search })}
           {navItem({ to: '/trending', label: 'Trending Deals', icon: TrendingUp })}
           {navItem({ to: '/insights', label: 'Graphical Insights', icon: BarChart3 })}
+          {navItem({ to: '/history', label: 'History', icon: History })}
           {navItem({ to: '/contact', label: 'Contact', icon: Mail })}
         </div>
       </div>
@@ -76,23 +77,20 @@ function Home() {
   )
 }
 
-function Filters({ filters, setFilters }) {
+function Filters({ filters, setFilters, catalogs }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
       <input value={filters.query} onChange={(e)=>setFilters(f=>({...f, query: e.target.value}))} placeholder="Search product..." className="px-4 py-2 rounded-lg bg-slate-800/60 border border-white/10 text-white placeholder:text-slate-400" />
       <select value={filters.category} onChange={(e)=>setFilters(f=>({...f, category: e.target.value}))} className="px-4 py-2 rounded-lg bg-slate-800/60 border border-white/10 text-white">
         <option value="">All Categories</option>
-        <option>Mobiles</option>
-        <option>Headphones</option>
-        <option>Shoes</option>
-        <option>Laptops</option>
-        <option>Fashion</option>
+        {catalogs.categories?.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
-      <input type="text" value={filters.brand} onChange={(e)=>setFilters(f=>({...f, brand: e.target.value}))} placeholder="Brand (optional)" className="px-4 py-2 rounded-lg bg-slate-800/60 border border-white/10 text-white placeholder:text-slate-400" />
-      <div className="flex items-center gap-2">
-        <input type="number" min={0} value={filters.price_min ?? ''} onChange={(e)=>setFilters(f=>({...f, price_min: e.target.value ? Number(e.target.value) : null}))} placeholder="Min" className="w-1/2 px-4 py-2 rounded-lg bg-slate-800/60 border border-white/10 text-white placeholder:text-slate-400" />
-        <input type="number" min={0} value={filters.price_max ?? ''} onChange={(e)=>setFilters(f=>({...f, price_max: e.target.value ? Number(e.target.value) : null}))} placeholder="Max" className="w-1/2 px-4 py-2 rounded-lg bg-slate-800/60 border border-white/10 text-white placeholder:text-slate-400" />
-      </div>
+      <select value={filters.brand} onChange={(e)=>setFilters(f=>({...f, brand: e.target.value}))} className="px-4 py-2 rounded-lg bg-slate-800/60 border border-white/10 text-white">
+        <option value="">All Brands</option>
+        {catalogs.brands?.map(b => <option key={b} value={b}>{b}</option>)}
+      </select>
+      <input type="number" min={0} value={filters.price_min ?? ''} onChange={(e)=>setFilters(f=>({...f, price_min: e.target.value ? Number(e.target.value) : null}))} placeholder="Min" className="px-4 py-2 rounded-lg bg-slate-800/60 border border-white/10 text-white placeholder:text-slate-400" />
+      <input type="number" min={0} value={filters.price_max ?? ''} onChange={(e)=>setFilters(f=>({...f, price_max: e.target.value ? Number(e.target.value) : null}))} placeholder="Max" className="px-4 py-2 rounded-lg bg-slate-800/60 border border-white/10 text-white placeholder:text-slate-400" />
     </div>
   )
 }
@@ -121,7 +119,7 @@ function ComparisonTable({ result }) {
             return (
               <tr key={idx} className={`rounded-xl ${isMin ? 'bg-green-500/10' : isMax ? 'bg-red-500/10' : 'bg-white/5'}`}>
                 <td className="px-4 py-3 font-medium text-white">{p.platform}</td>
-                <td className="px-4 py-3 font-semibold {isMin ? 'text-green-400' : isMax ? 'text-red-400' : 'text-white'}">₹{p.price.toLocaleString()}</td>
+                <td className={`px-4 py-3 font-semibold ${isMin ? 'text-green-400' : isMax ? 'text-red-400' : 'text-white'}`}>₹{p.price.toLocaleString()}</td>
                 <td className="px-4 py-3 text-slate-200">{p.rating ?? '—'}</td>
                 <td className="px-4 py-3 text-slate-200">{p.delivery ?? '—'}</td>
                 <td className="px-4 py-3"><a className="text-blue-400 hover:text-blue-300" href={p.url} target="_blank">View</a></td>
@@ -171,10 +169,21 @@ function PriceCharts({ result }) {
 }
 
 function ComparePage() {
+  const [catalogs, setCatalogs] = useState({ categories: [], brands: [] })
   const [filters, setFilters] = useState({ query: 'iPhone 15', category: '', brand: '', price_min: null, price_max: null })
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
+
+  useEffect(()=>{
+    (async ()=>{
+      try{
+        const res = await fetch(`${baseUrl}/api/catalogs`)
+        const json = await res.json()
+        setCatalogs(json)
+      }catch(_){/* ignore */}
+    })()
+  }, [])
 
   const search = async () => {
     if (!filters.query) return
@@ -205,7 +214,7 @@ function ComparePage() {
     <div className="max-w-7xl mx-auto px-6 py-8">
       <h2 className="text-2xl font-bold text-white mb-4">Price Comparison</h2>
       <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-        <Filters filters={filters} setFilters={setFilters} />
+        <Filters filters={filters} setFilters={setFilters} catalogs={catalogs} />
         <div className="mt-4 flex items-center gap-3">
           <button onClick={search} className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg"><Search className="w-4 h-4"/>Search</button>
           {loading && <span className="text-slate-300 text-sm">Loading...</span>}
@@ -292,6 +301,42 @@ function InsightsPage() {
   )
 }
 
+function HistoryPage(){
+  const [items, setItems] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(()=>{
+    (async ()=>{
+      try{
+        const res = await fetch(`${baseUrl}/api/search/recent`)
+        const json = await res.json()
+        setItems(json.items || [])
+      } finally {
+        setLoading(false)
+      }
+    })()
+  }, [])
+
+  return (
+    <div className="max-w-5xl mx-auto px-6 py-8">
+      <h2 className="text-2xl font-bold text-white mb-4">Recent Searches</h2>
+      {loading ? <p className="text-slate-300">Loading...</p> : (
+        <div className="space-y-3">
+          {items.map((it, idx)=> (
+            <div key={idx} className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between">
+              <div className="text-slate-200">
+                <div className="font-semibold text-white">{it.query}</div>
+                <div className="text-xs">{[it.brand, it.category].filter(Boolean).join(' • ') || '—'}</div>
+              </div>
+              <div className="text-xs text-slate-400">{it.results_count ?? 0} results</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Contact() {
   return (
     <div className="max-w-3xl mx-auto px-6 py-12">
@@ -310,6 +355,7 @@ function Layout() {
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/trending" element={<TrendingPage />} />
         <Route path="/insights" element={<InsightsPage />} />
+        <Route path="/history" element={<HistoryPage />} />
         <Route path="/contact" element={<Contact />} />
       </Routes>
       <footer className="py-8 text-center text-slate-400">© {new Date().getFullYear()} PricePulse</footer>
